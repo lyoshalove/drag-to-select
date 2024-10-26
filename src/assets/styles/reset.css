@@ -1,0 +1,10 @@
+:root {
+  --primary: #fff;
+  --secondary: #1d1c25;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}

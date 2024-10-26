@@ -1,0 +1,27 @@
+.wrapper {
+  max-width: 544px;
+  width: 100%;
+}
+
+.top {
+  border: 1px solid var(--primary);
+  padding: 4px 8px;
+}
+
+.area {
+  border: 1px solid var(--primary);
+  border-top: none;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 12px;
+}
+
+.areaItem {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid var(--primary);
+}
