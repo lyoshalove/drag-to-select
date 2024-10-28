@@ -19,4 +19,8 @@ export class DOMVector {
       Math.abs(this.magnitudeY)
     );
   }
+
+  getDiagonalLength() {
+    return Math.sqrt(this.magnitudeX ** 2 + this.magnitudeY ** 2);
+  }
 }

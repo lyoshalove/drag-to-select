@@ -1,4 +1,4 @@
-import { PointerEvent, useRef, useState } from "react";
+import { KeyboardEvent, PointerEvent, useRef, useState } from "react";
 import styles from "./styles.module.scss";
 import { DOMVector } from "./dom-vector";
 import cn from "classnames";
@@ -17,6 +17,7 @@ function intersect(rect1: DOMRect, rect2: DOMRect) {
 
 export const DragToSelect = () => {
   const [dragVector, setDragVector] = useState<DOMVector | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const selectionRect = dragVector?.toDOMRect();
   const [selectedItems, setSelectedItems] = useState<Record<string, boolean>>(
     {}
@@ -71,6 +72,8 @@ export const DragToSelect = () => {
         0
       )
     );
+
+    event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -87,12 +90,34 @@ export const DragToSelect = () => {
       event.clientY - containerRect.y - dragVector.y
     );
 
+    if (!isDragging && nextDragVector.getDiagonalLength() < 10) {
+      return;
+    }
+
+    setIsDragging(true);
+
+    containerRef.current?.focus();
+
     setDragVector(nextDragVector);
     updateSelectedItems(nextDragVector);
   };
 
   const handlePointerUp = () => {
-    setDragVector(null);
+    if (!isDragging) {
+      setSelectedItems({});
+      setDragVector(null);
+    } else {
+      setDragVector(null);
+      setIsDragging(false);
+    }
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setSelectedItems({});
+      setDragVector(null);
+    }
   };
 
   return (
@@ -108,7 +133,9 @@ export const DragToSelect = () => {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onKeyDown={handleKeyDown}
         className={styles.area}
+        tabIndex={-1}
       >
         {items.map((item) => (
           <div

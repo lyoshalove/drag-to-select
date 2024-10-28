@@ -5,6 +5,7 @@
 
 .top {
   border: 1px solid var(--primary);
+  border-bottom: none;
   padding: 4px 8px;
   display: flex;
   align-items: center;
@@ -14,11 +15,15 @@
 .area {
   position: relative;
   border: 1px solid var(--primary);
-  border-top: none;
   padding: 12px;
   display: grid;
   grid-template-columns: repeat(10, 1fr);
   gap: 12px;
+
+  &:focus {
+    outline: none;
+    border: 1px dashed var(--primary);
+  }
 }
 
 .areaItem {
