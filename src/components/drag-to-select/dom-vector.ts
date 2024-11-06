@@ -23,4 +23,26 @@ export class DOMVector {
   getDiagonalLength() {
     return Math.sqrt(this.magnitudeX ** 2 + this.magnitudeY ** 2);
   }
+
+  add(vector: DOMVector) {
+    return new DOMVector(
+      this.x + vector.x,
+      this.y + vector.y,
+      this.magnitudeX + vector.magnitudeX,
+      this.magnitudeY + vector.magnitudeY
+    );
+  }
+
+  clamp(vector: DOMRect) {
+    return new DOMVector(
+      this.x,
+      this.y,
+      Math.min(vector.width - this.x, this.magnitudeX),
+      Math.min(vector.height - this.y, this.magnitudeY)
+    );
+  }
+
+  toTerminalPoint(): DOMPoint {
+    return new DOMPoint(this.x + this.magnitudeX, this.y + this.magnitudeY);
+  }
 }

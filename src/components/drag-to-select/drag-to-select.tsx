@@ -1,9 +1,17 @@
-import { KeyboardEvent, PointerEvent, useRef, useState } from "react";
+import {
+  KeyboardEvent,
+  PointerEvent,
+  UIEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import styles from "./styles.module.scss";
 import { DOMVector } from "./dom-vector";
 import cn from "classnames";
 
-const items = Array(30)
+const items = Array(300)
   .fill(null)
   .map((_, idx) => idx + 1);
 
@@ -15,47 +23,71 @@ function intersect(rect1: DOMRect, rect2: DOMRect) {
   return true;
 }
 
+function shallowEqual(x: Record<string, boolean>, y: Record<string, boolean>) {
+  return (
+    Object.keys(x).length === Object.keys(y).length &&
+    Object.keys(x).every((key) => x[key] === y[key])
+  );
+}
+
 export const DragToSelect = () => {
   const [dragVector, setDragVector] = useState<DOMVector | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const selectionRect = dragVector?.toDOMRect();
   const [selectedItems, setSelectedItems] = useState<Record<string, boolean>>(
     {}
   );
   const containerRef = useRef<HTMLDivElement>(null);
+  const [scrollVector, setScrollVector] = useState<DOMVector | null>(null);
+  const selectionRect =
+    dragVector && scrollVector && isDragging && containerRef.current
+      ? dragVector
+          .add(scrollVector)
+          .clamp(
+            new DOMRect(
+              0,
+              0,
+              containerRef.current.scrollWidth,
+              containerRef.current.scrollHeight
+            )
+          )
+          .toDOMRect()
+      : null;
 
-  const updateSelectedItems = (dragVector: DOMVector) => {
-    if (containerRef.current == null) return;
+  const updateSelectedItems = useCallback(
+    (dragVector: DOMVector, scrollVector: DOMVector) => {
+      if (containerRef.current == null) return;
+      const next: Record<string, boolean> = {};
+      const containerRect = containerRef.current.getBoundingClientRect();
+      containerRef.current.querySelectorAll("[data-item]").forEach((el) => {
+        if (!(el instanceof HTMLElement)) return;
+        if (containerRef.current == null) return;
 
-    const next: Record<string, boolean> = {};
-    const containerRect = containerRef.current.getBoundingClientRect();
+        const itemRect = el.getBoundingClientRect();
+        const translatedItemRect = new DOMRect(
+          itemRect.x - containerRect.x + containerRef.current.scrollLeft,
+          itemRect.y - containerRect.y + containerRef.current.scrollTop,
+          itemRect.width,
+          itemRect.height
+        );
 
-    containerRef.current?.querySelectorAll("[data-item]").forEach((item) => {
-      if (!(item instanceof HTMLElement)) {
-        return;
+        if (
+          !intersect(
+            dragVector.add(scrollVector).toDOMRect(),
+            translatedItemRect
+          )
+        )
+          return;
+
+        if (el.dataset.item && typeof el.dataset.item === "string") {
+          next[el.dataset.item] = true;
+        }
+      });
+      if (!shallowEqual(next, selectedItems)) {
+        setSelectedItems(next);
       }
-
-      const itemRect = item.getBoundingClientRect();
-      const x = itemRect.x - containerRect.x;
-      const y = itemRect.y - containerRect.y;
-      const translatedItemRect = new DOMRect(
-        x,
-        y,
-        itemRect.width,
-        itemRect.height
-      );
-
-      if (!intersect(dragVector.toDOMRect(), translatedItemRect)) {
-        return;
-      }
-
-      if (item.dataset.item && typeof item.dataset.item === "string") {
-        next[item.dataset.item] = true;
-      }
-    });
-
-    setSelectedItems(next);
-  };
+    },
+    [selectedItems]
+  );
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) {
@@ -74,10 +106,19 @@ export const DragToSelect = () => {
     );
 
     event.currentTarget.setPointerCapture(event.pointerId);
+
+    setScrollVector(
+      new DOMVector(
+        event.currentTarget.scrollLeft,
+        event.currentTarget.scrollTop,
+        0,
+        0
+      )
+    );
   };
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (dragVector === null) {
+    if (dragVector === null || scrollVector === null) {
       return;
     }
 
@@ -99,7 +140,7 @@ export const DragToSelect = () => {
     containerRef.current?.focus();
 
     setDragVector(nextDragVector);
-    updateSelectedItems(nextDragVector);
+    updateSelectedItems(nextDragVector, scrollVector);
   };
 
   const handlePointerUp = () => {
@@ -110,6 +151,8 @@ export const DragToSelect = () => {
       setDragVector(null);
       setIsDragging(false);
     }
+
+    setScrollVector(null);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -118,7 +161,75 @@ export const DragToSelect = () => {
       setSelectedItems({});
       setDragVector(null);
     }
+
+    setScrollVector(null);
   };
+
+  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
+    if (dragVector === null || scrollVector === null) {
+      return;
+    }
+
+    const { scrollLeft, scrollTop } = event.currentTarget;
+
+    const nextScrollVector = new DOMVector(
+      scrollVector.x,
+      scrollVector.y,
+      scrollLeft - scrollVector.x,
+      scrollTop - scrollVector.y
+    );
+
+    setScrollVector(nextScrollVector);
+    updateSelectedItems(dragVector, nextScrollVector);
+  };
+
+  useEffect(() => {
+    if (!isDragging || containerRef.current == null) return;
+
+    let handle = requestAnimationFrame(scrollTheLad);
+
+    return () => cancelAnimationFrame(handle);
+
+    function clamp(num: number, min: number, max: number) {
+      return Math.min(Math.max(num, min), max);
+    }
+
+    function scrollTheLad() {
+      if (containerRef.current == null || dragVector == null) return;
+
+      const currentPointer = dragVector.toTerminalPoint();
+      const containerRect = containerRef.current.getBoundingClientRect();
+
+      const shouldScrollRight = containerRect.width - currentPointer.x < 20;
+      const shouldScrollLeft = currentPointer.x < 20;
+      const shouldScrollDown = containerRect.height - currentPointer.y < 20;
+      const shouldScrollUp = currentPointer.y < 20;
+
+      const left = shouldScrollRight
+        ? clamp(20 - containerRect.width + currentPointer.x, 0, 15)
+        : shouldScrollLeft
+        ? -1 * clamp(20 - currentPointer.x, 0, 15)
+        : undefined;
+
+      const top = shouldScrollDown
+        ? clamp(20 - containerRect.height + currentPointer.y, 0, 15)
+        : shouldScrollUp
+        ? -1 * clamp(20 - currentPointer.y, 0, 15)
+        : undefined;
+
+      if (top === undefined && left === undefined) {
+        handle = requestAnimationFrame(scrollTheLad);
+        return;
+      }
+
+      containerRef.current.scrollBy({
+        left,
+        top,
+      });
+
+      handle = requestAnimationFrame(scrollTheLad);
+    }
+  }, [isDragging, dragVector, updateSelectedItems]);
 
   return (
     <div className={styles.wrapper}>
@@ -134,6 +245,7 @@ export const DragToSelect = () => {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onKeyDown={handleKeyDown}
+        onScroll={handleScroll}
         className={styles.area}
         tabIndex={-1}
       >

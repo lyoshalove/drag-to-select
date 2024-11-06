@@ -1,5 +1,5 @@
 .wrapper {
-  max-width: 544px;
+  max-width: 534px;
   width: 100%;
 }
 
@@ -17,8 +17,10 @@
   border: 1px solid var(--primary);
   padding: 12px;
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  grid-template-columns: repeat(20, 1fr);
   gap: 12px;
+  max-height: 534px;
+  overflow: auto;
 
   &:focus {
     outline: none;
